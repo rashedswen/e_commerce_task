@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:developer';
 
 import 'package:e_commerce_task/models/item.dart';
 import 'package:e_commerce_task/models/transaction.dart';
@@ -26,13 +25,16 @@ class ItemsModel extends ChangeNotifier {
   }
 
   void addTransaction(Transactions transaction) {
-    final transactionsss = transaction;
-    Boxes.getTransactionsBox().add(transaction);
+    if (transaction.id != null) {
+      Boxes.getTransactionsBox().put(transaction.id, transaction);
+    } else {
+      Boxes.getTransactionsBox().add(transaction);
+    }
     notifyListeners();
   }
 
   void removeTransaction(Transactions transaction) {
-    Boxes.getTransactionsBox().delete(transaction);
+    Boxes.getTransactionsBox().delete(transaction.key);
     notifyListeners();
   }
 
@@ -44,47 +46,117 @@ class ItemsModel extends ChangeNotifier {
     return UnmodifiableListView(_items);
   }
 
-  void getItems() {
-    _items = Boxes.getItemsBox().values.toList();
+  List<Item> getItems() {
+    return _items = Boxes.getItemsBox().values.toList();
   }
 
-  void addItem(Item item) async {
-    final id = await Boxes.getItemsBox().add(item);
-    log(id.toString());
+  void addItem(Item item) {
+    if (item.id != null) {
+      Boxes.getItemsBox().put(item.id, item);
+    } else {
+      Boxes.getItemsBox().add(item);
+    }
     notifyListeners();
   }
 
   void removeItem(Item item) {
-    _items.remove(item);
+    Boxes.getItemsBox().delete(item.key);
     notifyListeners();
   }
 
-  List<TransactionWithItem> transactionsList() {
+  List<TransactionWithItem> transactionsList({String productName = ""}) {
     getTransactions();
     final s = Boxes.getTransactionsBox().values.map((transaction) {
-      log("${transaction.quantity} quantity");
       final item = Boxes.getItemsBox().values.firstWhere(
         (element) {
-          log("${element.key}item");
-          log("${transaction.itemId} Transaction");
-          log(transaction.itemId.toString());
-          log((element.key == transaction.itemId).toString());
-          return element.key.toString() == transaction.itemId;
+          element.name == _productName;
+          return element.key.toString() == transaction.itemId.toString();
         },
       );
-      log(transaction.type!);
 
       return TransactionWithItem(
-          type: transaction.type,
-          name: item.name,
-          sku: item.sku,
-          price: item.price,
-          inbound: transaction.type == "inbound"
-              ? transaction.inboudAt
-              : transaction.outboundAt);
+        transactionId: (transaction.key as int),
+        type: transaction.type,
+        name: item.name,
+        sku: item.sku,
+        price: item.price,
+        quantity: transaction.quantity,
+        description: item.description,
+        inbound: transaction.inboudAt,
+        outbound: transaction.outboundAt,
+      );
     }).toList();
 
-    _transactionsWithItem = s;
-    return s;
+    _transactionsWithItem = _productName.isNotEmpty
+        ? s
+            .where((value) {
+              if (value.name == null) return false;
+              return value.name!
+                  .toLowerCase()
+                  .contains(_productName.toLowerCase());
+            })
+            .toList()
+            .where((element) {
+              if (element.type == null) return false;
+              return element.type!.toLowerCase() == _type.toLowerCase();
+            })
+            .toList()
+        : _type.isNotEmpty
+            ? s
+                .where((element) => element.type!.toLowerCase() == _type)
+                .toList()
+            : s;
+    return _transactionsWithItem;
+  }
+
+  String _productName = "";
+
+  void searchTransactions(String productName) {
+    _productName = productName;
+    notifyListeners();
+  }
+
+  String _type = "";
+  String _sortBy = "";
+
+  void sortTransactions(String type, String sortBy) {
+    _sortBy = sortBy;
+    _type = type;
+    if (type == "inbound") {
+      _transactionsWithItem
+          .where((element) => element.type!.toLowerCase() == "inbound");
+    }
+    if (type == "outbound") {
+      _transactionsWithItem
+          .where((element) => element.type!.toLowerCase() == "outbound");
+    }
+    if (sortBy == "quantityAsec") {
+      _transactionsWithItem
+          .sort((a, b) => a.quantity!.compareTo(b.transactionId!));
+    } else if (sortBy == "quantityDesc") {
+      _transactionsWithItem
+          .sort((a, b) => b.quantity!.compareTo(a.transactionId!));
+    } else if (sortBy == "dateAsec") {
+      _transactionsWithItem.sort((a, b) => a.outbound!.compareTo(b.inbound!));
+    } else if (sortBy == "dateDesc") {
+      _transactionsWithItem.sort((a, b) => b.outbound!.compareTo(a.inbound!));
+    }
+    notifyListeners();
+  }
+
+  TransactionWithItem getTransactionWithItem(int transactionId) {
+    final transaction = Boxes.getTransactionsBox().get(transactionId);
+    final item = Boxes.getItemsBox().get(int.parse(transaction!.itemId!));
+    return TransactionWithItem(
+      type: transaction.type,
+      name: item?.name,
+      sku: item?.sku,
+      price: item?.price,
+      quantity: transaction.quantity,
+      description: item?.description,
+      inbound: transaction.inboudAt,
+      outbound: transaction.outboundAt,
+      image: item?.image,
+    );
   }
 }

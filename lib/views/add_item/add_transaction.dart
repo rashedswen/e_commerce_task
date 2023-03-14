@@ -1,29 +1,30 @@
-import 'dart:developer' as dev;
-import 'dart:io';
+import 'dart:developer';
 
-import 'package:e_commerce_task/models/item.dart';
+import 'package:e_commerce_task/models/transaction.dart';
 import 'package:e_commerce_task/viewModel/items_model.dart';
 import 'package:e_commerce_task/views/transactions_list/widgets/e_commerce_button.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 class AddTransactionScreen extends StatefulWidget {
-  const AddTransactionScreen({Key? key}) : super(key: key);
+  const AddTransactionScreen({Key? key, this.transactionId}) : super(key: key);
+
+  static const routeName = "/addTransaction";
+
+  final int? transactionId;
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
-  final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _skuController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  String _typeController = "inbound";
+  final _quantityController = TextEditingController();
 
-  String? _image;
+  int itemId = 0;
+  int selectedItemId = 0;
+  DateTime? inboundDate ;
+  DateTime? outboundDate;
 
   @override
   Widget build(BuildContext context) {
@@ -31,97 +32,112 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         appBar().preferredSize.height -
         MediaQuery.of(context).padding.top);
     final widthSize = MediaQuery.of(context).size.width;
+
+    if (widget.transactionId != null && _quantityController.text.isEmpty) {
+      final transaction = context.read<ItemsModel>().transactions.firstWhere(
+          (element) => element.key == widget.transactionId,
+          orElse: () => Transactions(type: "", quantity: 0, itemId: ""));
+      _typeController = transaction.type!;
+      _quantityController.text = transaction.quantity.toString();
+      itemId = int.parse(transaction.itemId!);
+      outboundDate = transaction.outboundAt;
+      inboundDate = transaction.inboudAt;
+      log("recall");
+    }
     return Scaffold(
       appBar: appBar(),
       body: Padding(
         padding: const EdgeInsets.only(top: 12.0, left: 8, right: 8),
         child: Column(
           children: [
-            InputRow(nameController: _nameController, label: "Name"),
-            const SizedBox(
-              height: 16,
+            Expanded(
+              child: Consumer<ItemsModel>(builder: (context, itemModel, child) {
+                itemModel.getItems();
+                return itemModel.items.isEmpty
+                    ? const Center(
+                        child: Text("No Items"),
+                      )
+                    : ListView.builder(
+                        scrollDirection: Axis.vertical,
+                        itemCount: itemModel.items.length,
+                        itemBuilder: (_, index) {
+                          final isSelected =
+                              itemId == itemModel.items[index].key;
+                          return TextButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedItemId = index;
+                                itemId = (itemModel.items[index].key as int);
+                              });
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(
+                                    height: heightSize * 0.05,
+                                    decoration: BoxDecoration(
+                                      color: !isSelected
+                                          ? Colors.white
+                                          : Colors.amber,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: Colors.black, width: 1),
+                                    ),
+                                    child: Center(
+                                        child: Text(
+                                            itemModel.items[index].name!))),
+                                const SizedBox(
+                                  height: 8,
+                                )
+                              ],
+                            ),
+                          );
+                        });
+              }),
             ),
-            InputRow(nameController: _priceController, label: "Price"),
-            const SizedBox(
-              height: 16,
-            ),
-            InputRow(nameController: _skuController, label: "SKU"),
-            const SizedBox(
-              height: 16,
-            ),
-            InputRow(
-                nameController: _descriptionController, label: "Description"),
-            const SizedBox(
-              height: 16,
-            ),
-            Row(
-              children: [
-                const Text(
-                  "Image",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+            DropdownButton<String>(
+              items: const [
+                DropdownMenuItem(
+                  value: "inbound",
+                  child: Text("inbound"),
                 ),
-                const SizedBox(
-                  width: 16,
+                DropdownMenuItem(
+                  value: "outbound",
+                  child: Text("outbound"),
                 ),
-                _image != null
-                    ? SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.2,
-                        width: MediaQuery.of(context).size.width * 0.5,
-                        child: Image.file(File(_image!), fit: BoxFit.contain))
-                    : TextButton(
-                        onPressed: () async {
-                          final image = await ImagePicker()
-                              .pickImage(source: ImageSource.gallery);
-
-                          // Check if the user canceled the picker
-                          if (image == null) return;
-
-                          // Get the image Path
-                          final applicationDirectory =
-                              await getApplicationDocumentsDirectory();
-                          final path = applicationDirectory.path;
-                          final fileName = basename(image.path);
-                          final saveFilePath = "$path/$fileName";
-
-                          await image.saveTo(saveFilePath);
-                          dev.log(image.path);
-                          setState(() {
-                            _image = saveFilePath;
-                          });
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                          child: Row(
-                            children: const [
-                              Icon(Icons.image),
-                              SizedBox(
-                                width: 8,
-                              ),
-                              Text("Upload Image"),
-                            ],
-                          ),
-                        ),
-                      ),
               ],
+              onChanged: (value) {
+                setState(() {
+                  _typeController = value.toString();
+                });
+              },
+              hint: const Text("Select Type"),
+              value: _typeController,
+            ),
+            InputRow(nameController: _quantityController, label: "quantity"),
+            const SizedBox(
+              height: 16,
             ),
             const Spacer(),
-            Consumer<ItemsModel>(builder: (context, itemModel, child) {
+            Consumer<ItemsModel>(builder: (_, itemModel, __) {
               return ElevatedButton(
                 child: const Text("Add Item"),
                 onPressed: () {
-                  itemModel.addItem(
-                    Item(
-                      name: _nameController.text,
-                      price: double.parse(_priceController.text),
-                      sku: _skuController.text,
-                      description: _descriptionController.text,
-                      image: _image,
-                    ),
+                  final transaction = Transactions(
+                    id: widget.transactionId,
+                    itemId: itemId.toString(),
+                    type: _typeController,
+                    inboudAt: _typeController.trim() == "inbound"
+                        ? DateTime.now()
+                        : inboundDate,
+                    outboundAt: _typeController.trim() == "outbound"
+                        ? DateTime.now()
+                        : outboundDate,
+                    quantity: int.parse(_quantityController.text),
                   );
+                  log("${itemId}add");
+                  log("${transaction.itemId}add");
+                  itemModel.addTransaction(transaction);
                   Navigator.pop(context);
                 },
               );
@@ -165,6 +181,9 @@ class InputRow extends StatelessWidget {
           child: EcommerceField(
             label: label,
             controller: _nameController,
+            onChanged: (value) {
+              
+            },
           ),
         ),
       ],

@@ -25,4 +25,22 @@ class Transactions extends HiveObject {
     this.inboudAt,
     this.outboundAt,
   });
+
+  Transactions copyWith({
+    int? id,
+    String? type,
+    String? itemId,
+    int? quantity,
+    DateTime? inboudAt,
+    DateTime? outboundAt,
+  }) {
+    return Transactions(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      itemId: itemId ?? this.itemId,
+      quantity: quantity ?? this.quantity,
+      inboudAt: inboudAt ?? this.inboudAt,
+      outboundAt: outboundAt ?? this.outboundAt,
+    );
+  }
 }
